@@ -6,12 +6,31 @@ import os
 import re
 import sys
 import time
+from PIL import Image
 
 import prompts
 from config import load_config
 from and_controller import list_all_devices, AndroidController, traverse_tree
 from model import parse_explore_rsp, parse_reflect_rsp, OpenAIModel, QwenModel
 from utils import print_with_color, draw_bbox_multi
+
+# 定义压缩图片的函数
+def compress_image(image_path, output_path):
+    try:
+        # 打开图片
+        with Image.open(image_path) as img:
+            # 获取原始尺寸
+            original_width, original_height = img.size
+            # 计算新尺寸 (50%)
+            new_width = original_width // 3
+            new_height = original_height // 3
+            # 压缩图片
+            img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            # 保存压缩后的图片
+            img_resized.save(output_path, optimize=True)
+            print(f"Image compressed successfully: {output_path}")
+    except Exception as e:
+        print(f"Error compressing image: {e}")
 
 arg_desc = "AppAgent - Autonomous Exploration"
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description=arg_desc)
@@ -90,10 +109,12 @@ task_complete = False
 while round_count < configs["MAX_ROUNDS"]:
     round_count += 1
     print_with_color(f"Round {round_count}", "yellow")
+    # 获取图片
     screenshot_before = controller.get_screenshot(f"{round_count}_before", task_dir)
     xml_path = controller.get_xml(f"{round_count}", task_dir)
     if screenshot_before == "ERROR" or xml_path == "ERROR":
         break
+
     clickable_list = []
     focusable_list = []
     traverse_tree(xml_path, clickable_list, "clickable", True)
@@ -124,8 +145,21 @@ while round_count < configs["MAX_ROUNDS"]:
     prompt = re.sub(r"<task_description>", task_desc, prompts.self_explore_task_template)
     prompt = re.sub(r"<last_act>", last_act, prompt)
     base64_img_before = os.path.join(task_dir, f"{round_count}_before_labeled.png")
+    # lijing
+    # compressed_image_path = os.path.join(task_dir, f"{round_count}_before_labeled_compressed.png")
+    # compress_image(base64_img_before, compressed_image_path)
+    # base64_img_before = compressed_image_path
+
     print_with_color("Thinking about what to do in the next step...", "yellow")
+
+    # lijing
+    print_with_color("=========Thinking=====================", "red")
+    print_with_color(f'{prompt}', "green")
+    print_with_color("==============================", "red")
+
     status, rsp = mllm.get_model_response(prompt, [base64_img_before])
+    # 打印 rsp
+    print_with_color(f'Thinking ==={status}===> {rsp}', "green")
 
     if status:
         with open(explore_log_path, "a") as logfile:
@@ -182,6 +216,10 @@ while round_count < configs["MAX_ROUNDS"]:
     draw_bbox_multi(screenshot_after, os.path.join(task_dir, f"{round_count}_after_labeled.png"), elem_list,
                     dark_mode=configs["DARK_MODE"])
     base64_img_after = os.path.join(task_dir, f"{round_count}_after_labeled.png")
+    # lijing compress after
+    # compressed_image_path = os.path.join(task_dir, f"{round_count}_after_labeled_compressed.png")
+    # compress_image(base64_img_after, compressed_image_path)
+    # base64_img_after = compressed_image_path
 
     if act_name == "tap":
         prompt = re.sub(r"<action>", "tapping", prompts.self_explore_reflect_template)
@@ -204,7 +242,16 @@ while round_count < configs["MAX_ROUNDS"]:
     prompt = re.sub(r"<last_act>", last_act, prompt)
 
     print_with_color("Reflecting on my previous action...", "yellow")
+
+    # lijing
+    print_with_color("===========Reflecting===================", "red")
+    print_with_color(f'{prompt}', "green")
+    print_with_color("==============================", "red")
+
     status, rsp = mllm.get_model_response(prompt, [base64_img_before, base64_img_after])
+    # lijing
+    print_with_color(f'reflection ==={status}===> {rsp}', "green")
+
     if status:
         resource_id = elem_list[int(area) - 1].uid
         with open(reflect_log_path, "a") as logfile:

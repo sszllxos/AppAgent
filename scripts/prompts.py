@@ -169,6 +169,7 @@ medium distance.
 The task you need to complete is to <task_description>. Your past actions to proceed with this task are summarized as 
 follows: <last_act>
 Now, given the following labeled screenshot, you need to think and call the function needed to proceed with the task. 
+To ensure that the input box gets the focus correctly, you need to click the input box before entering text.
 Your output should include three parts in the given format:
 Observation: <Describe what you observe in the image>
 Thought: <To complete the given task, what is the next step I should do>
